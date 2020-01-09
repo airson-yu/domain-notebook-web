@@ -13,7 +13,7 @@
                         <Input v-model="text_content" placeholder="请输入内容"></Input>
                     </div>
                     <div style="margin: 5px 0px;">
-                        <Input v-model="uid" placeholder="uid"></Input>
+                        <Input v-model="receiver" placeholder="receiver"></Input>
                         <Button type="primary" @click="send_im_msg"><span style="font-size: larger;">发送</span></Button>
                         <Button type="primary" @click="clear"><span style="font-size: larger;">clear</span></Button>
                         <Button type="primary">

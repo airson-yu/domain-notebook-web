@@ -13,6 +13,7 @@ export default {
         return {
             im_list: [],
             uid: 2,
+            receiver: 2,
             account: 'airson',
             password: '123123',
             token: '',
@@ -33,8 +34,9 @@ export default {
         initWebSocket() {
             //this.connection();
         },
-        removeTab(targetName) {
-            console.log(targetName)
+        disconnect() {
+            let that = this;
+            that.socket.close();
         },
         connection() {
             let that = this;
@@ -44,27 +46,90 @@ export default {
             that.socket = new WebSocket(url);
             //连接打开事件
             that.socket.onopen = function () {
-                console.log("Socket 已打开");
-                that.socket.send("消息发送测试(From Client)");
+                console.log("ws onopen");
+                //that.socket.send("消息发送测试(From Client)");
             };
             //收到消息事件
             that.socket.onmessage = function (msg) {
                 console.log(msg.data);
+                that.receive_msg(msg);
             };
             //连接关闭事件
             that.socket.onclose = function () {
-                console.log("Socket已关闭");
+                console.log("ws onclose");
             };
             //发生了错误事件
-            that.socket.onerror = function () {
+            that.socket.onerror = function (ev) {
+                console.log("ws onerror:", ev);
                 alert("Socket发生了错误");
             }
             window.unload = function () {
-                that.socket.close();
-            };
+                that.disconnect();
+            }
+        },
+        //----------------------------------------------------
+        login() {
+            let that = this;
+            let url = 'http://localhost:8888/v1/im/login';
+            let param = {account: that.account, password: that.password};
+            axios.post(url, Qs.stringify(param)).then(function (response) {
+                let rsp = response.data;
+                if (rsp && rsp.success) {
+                    console.log(rsp.uid);
+                    that.uid = rsp.uid;
+                    that.token = rsp.token;
+                    that.connection();
+                } else {
+                    console.log(rsp);
+                }
+            }).catch(function (err) {
+                console.log(err)
+            });
+        },
+        send_im_msg() {
+            let that = this;
+            that.append_im_msg();
+        },
+        append_im_msg() {
+            let that = this;
+            let content = that.text_content;
+            let data = {
+                'content': content,
+                'ts': new Date().getTime(),
+                'state': 1, //1:local_append, 11:sending_to_server 21:sent_to_server_success 21:sent_to_server_failure
+                'receiver': that.receiver,
+                'sender': that.uid
+            }
+            let ary_len = that.im_list.push(data);
+            that.remote_send_msg(data, ary_len);
+        },
+        receive_msg(msg) {
+            let that = this;
+            console.log("receive_msg:", msg.data);
+            that.im_list.push(msg.data);
+        },
+        clear() {
+            let that = this;
+            that.im_list = [];
+        },
+        remote_send_msg(data, ary_len) {
+            let that = this;
+            try {
+                let index = ary_len - 1;
+                that.im_list[index].state = 11;
+                let msg = JSON.stringify(data);
+                //that.stompClient.send("/app/chat", {}, msg);
+                that.socket.send(msg);
+            } catch (err) {
+                console.log("断线了: " + err);
+                that.connection();
+            }
+        }
 
+        /*connection() {
+            let that = this;
             // way 2: base on stomp
-            /*// 建立连接对象
+            // 建立连接对象
             let url = 'http://localhost:8888/chat';
             this.socket = new SockJS(url);//连接服务端提供的通信接口，连接以后才可以订阅广播消息和个人消息
             // 获取STOMP子协议的客户端对象
@@ -85,67 +150,16 @@ export default {
             }, (err) => {
                 // 连接发生错误时的处理函数
                 console.log(err);
-            });*/
+            });
 
         },
-        // 断开连接
-        disconnect() {
+        disconnect() {// 断开连接
             if (this.stompClient != null) {
                 this.stompClient.disconnect();
                 console.log("Disconnected");
             }
-        },
+        },*/
 
-        //----------------------------------------------------
-        login() {
-            let that = this;
-            let url = 'http://localhost:8888/v1/im/login';
-            let param = {account: that.account, password: that.password};
-            axios.post(url, Qs.stringify(param)).then(function (response) {
-                let rsp = response.data;
-                if (rsp && rsp.success) {
-                    console.log(rsp.uid);
-                    that.token = rsp.token;
-                    that.connection();
-                } else {
-                    console.log(rsp);
-                }
-            }).catch(function (err) {
-                console.log(err)
-            });
-        },
-        send_im_msg() {
-            let that = this;
-            that.append_im_msg();
-        },
-        append_im_msg() {
-            let that = this;
-            let content = that.text_content;
-            let data = {
-                'content': content,
-                'ts': new Date().getTime(),
-                'state': 1 //1:local_append, 11:sending_to_server 21:sent_to_server_success 21:sent_to_server_failure
-            }
-            let ary_len = that.im_list.push(data);
-            that.remote_send_msg(data, ary_len);
-        },
-        clear() {
-            let that = this;
-            that.im_list = [];
-        },
-        remote_send_msg(data, ary_len) {
-            let that = this;
-            try {
-                let index = ary_len - 1;
-                that.im_list[index].state = 11;
-                let msg = JSON.stringify(data);
-                //that.stompClient.send("/app/chat", {}, msg);
-                that.socket.send(msg);
-            } catch (err) {
-                console.log("断线了: " + err);
-                that.connection();
-            }
-        }
         /*remote_send_msg(data, ary_len) {
             let that = this;
             let index = ary_len - 1;
